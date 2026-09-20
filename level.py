@@ -78,7 +78,7 @@ LEVELS: tuple[Level, ...] = (
             (0, 0): "UP", (0, 2): "LEFT", (0, 5): "UP", (0, 7): "RIGHT",
             (1, 1): "DOWN", (1, 4): "RIGHT", (1, 6): "UP",
             (2, 0): "LEFT", (2, 3): "RIGHT", (2, 5): "DOWN",
-            (3, 1): "UP", (3, 4): "LEFT", (3, 7): "RIGHT",
+            (3, 1): "LEFT", (3, 4): "LEFT", (3, 7): "RIGHT",
             (4, 0): "DOWN", (4, 2): "RIGHT", (4, 6): "UP",
             (5, 1): "LEFT", (5, 3): "DOWN", (5, 5): "RIGHT",
             (6, 0): "DOWN", (6, 4): "LEFT", (6, 7): "UP",
@@ -103,4 +103,3 @@ def validate_levels() -> None:
 
 
 validate_levels()
-
