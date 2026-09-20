@@ -44,6 +44,7 @@ class GameApp:
         self.state = GameState()
         self.running = True
         self.started_at = pygame.time.get_ticks()
+        self.finished_elapsed: int | None = None
         self.flying: list[FlyingArrow] = []
         self.blocked_at = 0
         self.blocked_pos: tuple[int, int] | None = None
@@ -86,11 +87,14 @@ class GameApp:
         self.state.load_level(index)
         self.scene = "game"
         self.started_at = pygame.time.get_ticks()
+        self.finished_elapsed = None
         self.flying.clear()
         self.blocked_pos = None
         self.hint_pos = None
 
     def elapsed(self) -> int:
+        if self.finished_elapsed is not None:
+            return self.finished_elapsed
         return max(0, (pygame.time.get_ticks() - self.started_at) // 1000)
 
     def stars(self) -> int:
@@ -123,6 +127,7 @@ class GameApp:
         if buttons[0].hit(position):
             self.state.restart()
             self.started_at = pygame.time.get_ticks()
+            self.finished_elapsed = None
             self.flying.clear()
             return
         if buttons[1].hit(position):
@@ -157,8 +162,11 @@ class GameApp:
             self.blocked_pos = (result.arrow.row, result.arrow.col)
             self.blocked_at = now
             self.toast_message("BLOCKED! 前方有箭头")
+            if self.state.status is GameStatus.FAILED:
+                self.finished_elapsed = self.elapsed()
 
     def _complete_level(self) -> None:
+        self.finished_elapsed = self.elapsed()
         index = self.state.level_index
         self.unlocked = max(self.unlocked, min(len(LEVELS), index + 2))
         key = str(index)
@@ -171,9 +179,9 @@ class GameApp:
 
     def game_buttons(self) -> list[Button]:
         return [
-            Button(pygame.Rect(682, 480, 250, 48), "↻ 重新开始", CORAL),
-            Button(pygame.Rect(682, 542, 118, 48), "↶ 撤销", LAVENDER, bool(self.state.history)),
-            Button(pygame.Rect(814, 542, 118, 48), "✦ 提示", CYAN),
+            Button(pygame.Rect(682, 480, 250, 48), "重新开始", CORAL),
+            Button(pygame.Rect(682, 542, 118, 48), "撤销", LAVENDER, bool(self.state.history)),
+            Button(pygame.Rect(814, 542, 118, 48), "提示", CYAN),
             Button(pygame.Rect(682, 604, 250, 48), "关卡选择", INK),
         ]
 
@@ -186,6 +194,7 @@ class GameApp:
             elif event.key == pygame.K_r and self.scene == "game":
                 self.state.restart()
                 self.started_at = pygame.time.get_ticks()
+                self.finished_elapsed = None
             elif event.key == pygame.K_z and self.scene == "game":
                 self.state.undo()
             elif event.key == pygame.K_h and self.scene == "game":
@@ -429,4 +438,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
