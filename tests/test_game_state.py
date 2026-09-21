@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import unittest
+import wave
+from pathlib import Path
 
 from arrow import Arrow
 from constants import Direction, GameStatus
@@ -56,6 +58,15 @@ class GameStateAcceptanceTests(unittest.TestCase):
 
 
 class DirectionAndExtraFeatureTests(unittest.TestCase):
+    def test_original_audio_assets_are_valid_wav_files(self) -> None:
+        audio_dir = Path(__file__).resolve().parents[1] / "assets" / "audio"
+        for name in ("background", "launch", "wrong", "failure", "clear", "button"):
+            with self.subTest(name=name), wave.open(str(audio_dir / f"{name}.wav"), "rb") as stream:
+                self.assertEqual(1, stream.getnchannels())
+                self.assertEqual(2, stream.getsampwidth())
+                self.assertEqual(22_050, stream.getframerate())
+                self.assertGreater(stream.getnframes(), 2_000)
+
     def test_all_four_directions_scan_correctly(self) -> None:
         game = GameState(0)
         game.level = LEVELS[0]

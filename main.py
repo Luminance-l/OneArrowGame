@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pygame
 
+from audio import AudioManager
 from arrow import Arrow
 from constants import FPS, GameStatus, WINDOW_SIZE
 from game_state import GameState
@@ -40,6 +41,7 @@ class GameApp:
         self.surface = pygame.display.set_mode(WINDOW_SIZE)
         self.clock = pygame.time.Clock()
         self.fonts = self._load_fonts()
+        self.audio = AudioManager(BASE_DIR / "assets" / "audio")
         self.scene = "start"
         self.state = GameState()
         self.running = True
@@ -125,18 +127,21 @@ class GameApp:
     def handle_game_click(self, position: tuple[int, int]) -> None:
         buttons = self.game_buttons()
         if buttons[0].hit(position):
+            self.audio.play("button")
             self.state.restart()
             self.started_at = pygame.time.get_ticks()
             self.finished_elapsed = None
             self.flying.clear()
             return
         if buttons[1].hit(position):
+            self.audio.play("button")
             if self.state.undo():
                 self.toast_message("已撤销上一步")
             else:
                 self.toast_message("暂无可撤销操作")
             return
         if buttons[2].hit(position):
+            self.audio.play("button")
             hint = self.state.hint()
             if hint:
                 self.hint_pos = (hint.row, hint.col)
@@ -144,7 +149,12 @@ class GameApp:
                 self.toast_message("AI 已标出安全箭头")
             return
         if buttons[3].hit(position):
+            self.audio.play("button")
             self.scene = "levels"
+            return
+        if buttons[4].hit(position):
+            enabled = self.audio.toggle()
+            self.toast_message("声音已开启" if enabled else "声音已关闭")
             return
 
         cell = self.cell_at(position)
@@ -153,17 +163,22 @@ class GameApp:
         result = self.state.click(*cell)
         now = pygame.time.get_ticks()
         if result.kind == "removed" and result.arrow:
+            self.audio.play("launch")
             x, y = self.cell_center(result.arrow.row, result.arrow.col)
             self.flying.append(FlyingArrow(result.arrow, x, y))
             self.hint_pos = None
             if self.state.status is GameStatus.CLEARED:
+                self.audio.play("clear")
                 self._complete_level()
         elif result.kind == "blocked" and result.arrow:
             self.blocked_pos = (result.arrow.row, result.arrow.col)
             self.blocked_at = now
             self.toast_message("BLOCKED! 前方有箭头")
             if self.state.status is GameStatus.FAILED:
+                self.audio.play("failure")
                 self.finished_elapsed = self.elapsed()
+            else:
+                self.audio.play("wrong")
 
     def _complete_level(self) -> None:
         self.finished_elapsed = self.elapsed()
@@ -183,6 +198,7 @@ class GameApp:
             Button(pygame.Rect(682, 542, 118, 48), "撤销", LAVENDER, bool(self.state.history)),
             Button(pygame.Rect(814, 542, 118, 48), "提示", CYAN),
             Button(pygame.Rect(682, 604, 250, 48), "关卡选择", INK),
+            Button(pygame.Rect(682, 664, 250, 40), self.audio.label, GOLD),
         ]
 
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -202,15 +218,19 @@ class GameApp:
                 if hint:
                     self.hint_pos = (hint.row, hint.col)
                     self.hint_at = pygame.time.get_ticks()
+            elif event.key == pygame.K_m:
+                self.audio.toggle()
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return
         pos = event.pos
         if self.scene == "start":
             if Button(pygame.Rect(350, 480, 300, 64), "开始游戏", CYAN).hit(pos):
+                self.audio.play("button")
                 self.scene = "levels"
         elif self.scene == "levels":
             for index, button in enumerate(self.level_buttons()):
                 if button.hit(pos):
+                    self.audio.play("button")
                     self.start_level(index)
             if Button(pygame.Rect(40, 680, 130, 44), "← 返回", INK).hit(pos):
                 self.scene = "start"
@@ -222,13 +242,16 @@ class GameApp:
 
     def handle_result_click(self, pos: tuple[int, int]) -> None:
         if Button(pygame.Rect(365, 475, 270, 56), "下一关", CYAN).hit(pos) and self.state.status is GameStatus.CLEARED:
+            self.audio.play("button")
             if self.state.level_index + 1 < len(LEVELS):
                 self.start_level(self.state.level_index + 1)
             else:
                 self.scene = "levels"
         elif Button(pygame.Rect(365, 545, 270, 52), "再试一次", CORAL).hit(pos):
+            self.audio.play("button")
             self.start_level(self.state.level_index)
         elif Button(pygame.Rect(365, 611, 270, 48), "返回关卡", INK).hit(pos):
+            self.audio.play("button")
             self.scene = "levels"
 
     def update(self, dt: float) -> None:
@@ -345,7 +368,7 @@ class GameApp:
             self.draw_text(value, "body", INK, (rect.right - 16, rect.centery), "midright")
         for button in self.game_buttons():
             button.draw(self.surface, self.fonts["body"], pygame.mouse.get_pos())
-        self.draw_text("快捷键  H 提示  Z 撤销  R 重开", "small", MUTED, (807, 685), "center")
+        self.draw_text("快捷键  H 提示  Z 撤销  R 重开  M 静音", "small", MUTED, (807, 728), "center")
 
     def draw_result_overlay(self) -> None:
         shade = pygame.Surface(WINDOW_SIZE, pygame.SRCALPHA)
@@ -429,6 +452,7 @@ def main() -> None:
     args = parse_args()
     if args.capture:
         os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+        os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
     app = GameApp(headless=bool(args.capture))
     if args.capture:
         app.capture(args.capture)
