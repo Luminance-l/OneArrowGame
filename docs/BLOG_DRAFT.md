@@ -8,7 +8,7 @@
 | 这个作业要求在哪里 | 【待填写：本次作业网页链接】 |
 | 这个作业的目标 | 使用 Python 和 AIGC 完成“一箭又一箭”小游戏 |
 | 学号 | 【待填写：本人学号】 |
-| GitHub 仓库 | 【待填写：仓库链接】 |
+| GitHub 仓库 | [Luminance-l/OneArrowGame](https://github.com/Luminance-l/OneArrowGame) |
 
 ## 一、项目展示
 
