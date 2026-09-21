@@ -52,6 +52,7 @@ class GameApp:
         self.blocked_pos: tuple[int, int] | None = None
         self.hint_pos: tuple[int, int] | None = None
         self.hint_at = 0
+        self.reasoning_view = False
         self.toast = ""
         self.toast_at = 0
         self.unlocked, self.best_scores = self._load_progress()
@@ -93,6 +94,7 @@ class GameApp:
         self.flying.clear()
         self.blocked_pos = None
         self.hint_pos = None
+        self.reasoning_view = False
 
     def elapsed(self) -> int:
         if self.finished_elapsed is not None:
@@ -150,9 +152,14 @@ class GameApp:
             return
         if buttons[3].hit(position):
             self.audio.play("button")
-            self.scene = "levels"
+            self.reasoning_view = not self.reasoning_view
+            self.toast_message("推理透视已开启：绿线可走，红线被阻挡" if self.reasoning_view else "推理透视已关闭")
             return
         if buttons[4].hit(position):
+            self.audio.play("button")
+            self.scene = "levels"
+            return
+        if buttons[5].hit(position):
             enabled = self.audio.toggle()
             self.toast_message("声音已开启" if enabled else "声音已关闭")
             return
@@ -197,8 +204,9 @@ class GameApp:
             Button(pygame.Rect(682, 480, 250, 48), "重新开始", CORAL),
             Button(pygame.Rect(682, 542, 118, 48), "撤销", LAVENDER, bool(self.state.history)),
             Button(pygame.Rect(814, 542, 118, 48), "提示", CYAN),
-            Button(pygame.Rect(682, 604, 250, 48), "关卡选择", INK),
-            Button(pygame.Rect(682, 664, 250, 40), self.audio.label, GOLD),
+            Button(pygame.Rect(682, 600, 250, 42), f"推理透视：{'开' if self.reasoning_view else '关'}", GOLD),
+            Button(pygame.Rect(682, 650, 250, 42), "关卡选择", INK),
+            Button(pygame.Rect(682, 700, 250, 34), self.audio.label, LAVENDER),
         ]
 
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -220,6 +228,9 @@ class GameApp:
                     self.hint_at = pygame.time.get_ticks()
             elif event.key == pygame.K_m:
                 self.audio.toggle()
+            elif event.key == pygame.K_t and self.scene == "game":
+                self.reasoning_view = not self.reasoning_view
+                self.toast_message("推理透视已开启" if self.reasoning_view else "推理透视已关闭")
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return
         pos = event.pos
@@ -325,6 +336,9 @@ class GameApp:
             pygame.draw.line(self.surface, (226, 222, 212), (x, board.top + 18), (x, board.bottom - 18))
             pygame.draw.line(self.surface, (226, 222, 212), (board.left + 18, y), (board.right - 18, y))
 
+        if self.reasoning_view:
+            self.draw_reasoning_paths(board, cell)
+
         palette = {"UP": CYAN, "DOWN": CORAL, "LEFT": GOLD, "RIGHT": LAVENDER}
         for arrow in self.state.arrows.values():
             center = list(self.cell_center(arrow.row, arrow.col))
@@ -351,6 +365,28 @@ class GameApp:
         if self.state.status is not GameStatus.PLAYING:
             self.draw_result_overlay()
 
+    def draw_reasoning_paths(self, board: pygame.Rect, cell: float) -> None:
+        """Expose the scan algorithm as an explainable, player-facing overlay."""
+        overlay = pygame.Surface(WINDOW_SIZE, pygame.SRCALPHA)
+        for arrow in self.state.arrows.values():
+            start = self.cell_center(arrow.row, arrow.col)
+            blocker = self.state.blocker_for(arrow.row, arrow.col)
+            dr, dc = arrow.direction.delta
+            if blocker is None:
+                distance = max(self.state.level.size, 2) * cell
+                end = (start[0] + dc * distance, start[1] + dr * distance)
+                end = (
+                    min(board.right - 10, max(board.left + 10, end[0])),
+                    min(board.bottom - 10, max(board.top + 10, end[1])),
+                )
+                color = (*CYAN, 95)
+            else:
+                end = self.cell_center(blocker.row, blocker.col)
+                color = (*CORAL, 105)
+                pygame.draw.circle(overlay, (*CORAL, 150), (round(end[0]), round(end[1])), max(8, int(cell * .14)), 3)
+            pygame.draw.line(overlay, color, start, end, max(3, int(cell * .055)))
+        self.surface.blit(overlay, (0, 0))
+
     def draw_sidebar(self) -> None:
         x = 682
         self.draw_text("本局状态", "h2", INK, (x, 144))
@@ -368,7 +404,10 @@ class GameApp:
             self.draw_text(value, "body", INK, (rect.right - 16, rect.centery), "midright")
         for button in self.game_buttons():
             button.draw(self.surface, self.fonts["body"], pygame.mouse.get_pos())
-        self.draw_text("快捷键  H 提示  Z 撤销  R 重开  M 静音", "small", MUTED, (807, 728), "center")
+        safe_count = len(self.state.safe_arrows())
+        insight = f"当前可安全移除 {safe_count} 支" if self.reasoning_view else "T 开关推理透视"
+        self.draw_text(insight, "small", CYAN if self.reasoning_view else MUTED, (807, 456), "center")
+        self.draw_text("H 提示  Z 撤销  R 重开  T 透视  M 静音", "small", MUTED, (500, 742), "center")
 
     def draw_result_overlay(self) -> None:
         shade = pygame.Surface(WINDOW_SIZE, pygame.SRCALPHA)
@@ -424,8 +463,10 @@ class GameApp:
         self.draw()
         pygame.image.save(self.surface, output_dir / "02_levels.png")
         self.start_level(2)
+        self.reasoning_view = True
         self.draw()
         pygame.image.save(self.surface, output_dir / "03_game.png")
+        pygame.image.save(self.surface, output_dir / "06_reasoning.png")
         while self.state.status is GameStatus.PLAYING:
             hint = self.state.hint()
             if hint is None:

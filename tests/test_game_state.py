@@ -102,6 +102,13 @@ class DirectionAndExtraFeatureTests(unittest.TestCase):
         self.assertIsNotNone(hint)
         self.assertTrue(game.can_exit(hint.row, hint.col))
 
+    def test_reasoning_view_can_explain_first_blocker(self) -> None:
+        game = GameState(0)
+        blocker = game.blocker_for(2, 2)
+        self.assertIsNotNone(blocker)
+        self.assertEqual((2, 4), (blocker.row, blocker.col))
+        self.assertIsNone(game.blocker_for(0, 2))
+
     def test_every_level_is_solvable_and_uses_all_directions(self) -> None:
         for index, level in enumerate(LEVELS):
             with self.subTest(level=index + 1):

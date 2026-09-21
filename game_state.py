@@ -79,6 +79,11 @@ class GameState:
         arrow = self.arrows.get((row, col))
         return arrow is not None and self._first_blocker(arrow) is None
 
+    def blocker_for(self, row: int, col: int) -> Arrow | None:
+        """Return the first visible blocker for UI explanations, if any."""
+        arrow = self.arrows.get((row, col))
+        return self._first_blocker(arrow) if arrow is not None else None
+
     def _remember(self) -> None:
         self.history.append(Snapshot(
             self.arrows.copy(), self.mistakes, self.score, self.status, self.hints_used
