@@ -82,6 +82,11 @@ def main() -> None:
         durations.append(900)
 
         for move_index, (row, col) in enumerate(solution, start=1):
+            # The GIF is rendered much faster than real time. Advance the
+            # displayed timer by a plausible 1–2 seconds per observed move so
+            # the replay does not misleadingly show 00s throughout.
+            app.started_at -= 2000 if move_index % 3 == 0 else 1000
+
             # Pause on the intended arrow before clicking it.
             frames.append(frame(app, (row, col), (move_index, len(solution))))
             durations.append(380 + (move_index % 3) * 70)
